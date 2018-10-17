@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 fn main() {
-    let board = build_board();
+    let board = default_board();
     print_board(&board);
     let mut sudoku = Sudoku::new(board);
     if let Some(solved_board) = sudoku.solve() {
@@ -11,7 +11,7 @@ fn main() {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Cell {
     solution: Option<i8>,
     candidates: HashSet<i8>,
@@ -290,7 +290,7 @@ impl Sudoku {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 struct Square {
     solutions: HashSet<i8>,
 }
@@ -323,14 +323,27 @@ fn square_index(row: usize, col: usize) -> usize {
     square_idx
 }
 
-#[cfg(tests)]
+#[cfg(test)]
 mod tests {
     use super::*;
 
-    // TODO
-
     #[test]
     fn test_make_squares() {
+        let board = default_board();
+        let squares = make_squares(&board);
+        println!("{:#?}", squares);
+
+        assert_eq!(squares, vec![
+            Square { solutions: vec![5, 2, 7, 9].iter().cloned().collect::<HashSet<i8>>(), },
+            Square { solutions: vec![8, 3, 4, 5].iter().cloned().collect::<HashSet<i8>>(), },
+            Square { solutions: vec![5, 6, 2].iter().cloned().collect::<HashSet<i8>>(), },
+            Square { solutions: vec![4, 9, 1, 7].iter().cloned().collect::<HashSet<i8>>(), },
+            Square { solutions: vec![6, 4, 5, 7, 8, 2].iter().cloned().collect::<HashSet<i8>>(), },
+            Square { solutions: vec![7, 8, 1, 3].iter().cloned().collect::<HashSet<i8>>(), },
+            Square { solutions: vec![5, 4, 6].iter().cloned().collect::<HashSet<i8>>(), },
+            Square { solutions: vec![7, 8, 3, 1].iter().cloned().collect::<HashSet<i8>>(), },
+            Square { solutions: vec![9, 6, 5, 4].iter().cloned().collect::<HashSet<i8>>(), },
+        ]);
     }
 
     #[test]
@@ -392,7 +405,7 @@ fn print_board(board: &Vec<Vec<Cell>>) {
     println!("{}", border);
 }
 
-fn build_board() -> Vec<Vec<Cell>> {
+fn default_board() -> Vec<Vec<Cell>> {
     vec![
         vec![
             unsolved(), unsolved(), solved(5),
