@@ -80,7 +80,7 @@ impl Sudoku {
                 if candidates.len() == 1 {
                     // We have a solution for this cell.
                     let solution = *candidates.iter().next().unwrap();
-                    self.found_solution(solution, row, col);
+                    self.found_solution(row, col, solution);
                 } else if !candidates.is_empty() {
                     self.board[row][col].candidates = candidates;
                 }
@@ -128,7 +128,7 @@ impl Sudoku {
     /// assignment phase. The solution is removed from the candidate list of all
     /// cells in the same row, column, and square, thus further narrowing down
     /// the search-space.
-    fn found_solution(&mut self, solution: i8, row: usize, col: usize) {
+    fn found_solution(&mut self, row: usize, col: usize, solution: i8) {
         // We have a solution for this cell.
         let cell = &mut self.board[row][col];
         let block = &mut self.blocks[block_index(row, col)];
