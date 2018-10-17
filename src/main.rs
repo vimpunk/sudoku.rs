@@ -43,11 +43,11 @@ impl Cell {
     }
 }
 
-pub type Board = Vec<Vec<Cell>>;
+pub type Board = [[Cell; 9]; 9];
 
 pub struct Sudoku {
     board: Board,
-    blocks: Vec<Block>,
+    blocks: [Block; 9],
 }
 
 impl Sudoku {
@@ -263,23 +263,29 @@ impl Sudoku {
     }
 }
 
-/// A block represents a 3x3 block of cells in a Sudoku board. This is used by
-/// the solver to quickly verify that a candidate is not already solved in its
+/// Represents a 3x3 block of cells in a Sudoku board. This is used by the
+/// solver to quickly verify that a candidate is not already solved in its
 /// block.
 #[derive(Debug, Eq, PartialEq)]
 struct Block {
+    // TODO: use BitSet or just a u16
     solutions: HashSet<i8>,
 }
 
 /// Partitions a Sudoku board into a vector of blocks.
-fn make_blocks(board: &Vec<Vec<Cell>>) -> Vec<Block> {
-    let num_blocks = 9;
-    let mut blocks = Vec::with_capacity(num_blocks);
-
-    // Fill blocks vec. TODO more idiomatic way of doing this?
-    for _ in 0..num_blocks {
-        blocks.push(Block { solutions: HashSet::new() });
-    }
+fn make_blocks(board: &Board) -> [Block; 9] {
+    // TODO remove unsafe code once Block is copyable (i.e. when switching to an
+    // i16 bitmask for solutions)
+    let mut blocks: [Block; 9] = unsafe {
+        let mut blocks: [Block; 9] = std::mem::uninitialized();
+        // Fill blocks vec. TODO more idiomatic way of doing this?
+        for element in blocks.iter_mut() {
+            let block = Block { solutions: HashSet::new() };
+            // Overwrite element without running the destructor of the old value.
+            std::ptr::write(element, block);
+        }
+        blocks
+    };
 
     for (row_idx, row) in board.iter().enumerate() {
         for (col_idx, col) in row.iter().enumerate() {
@@ -375,7 +381,7 @@ fn unsolved() -> Cell {
     Cell::unsolved()
 }
 
-fn print_board(board: &Vec<Vec<Cell>>) {
+fn print_board(board: &Board) {
     let border = {
         let mut s = String::new();
         s.push('|');
@@ -421,51 +427,51 @@ fn print_board(board: &Vec<Vec<Cell>>) {
     println!("{}", border);
 }
 
-fn default_board() -> Vec<Vec<Cell>> {
-    vec![
-        vec![
+fn default_board() -> Board {
+    [
+        [
             unsolved(), unsolved(), solved(5),
             unsolved(), unsolved(), solved(8),
             unsolved(), unsolved(), unsolved(),
         ],
-        vec![
+        [
             unsolved(), solved(2), unsolved(),
             unsolved(), unsolved(), unsolved(),
             solved(5), unsolved(), unsolved(),
         ],
-        vec![
+        [
             solved(7), solved(9), unsolved(),
             solved(3), solved(4), solved(5),
             solved(6), solved(2), unsolved(),
         ],
 
-        vec![
+        [
             unsolved(), unsolved(), unsolved(),
             solved(6), unsolved(), solved(4),
             solved(7), solved(1), unsolved(),
         ],
-        vec![
+        [
             unsolved(), solved(4), solved(9),
             solved(5), unsolved(), solved(7),
             solved(8), solved(3), unsolved(),
         ],
-        vec![
+        [
             unsolved(), solved(1), solved(7),
             solved(8), unsolved(), solved(2),
             unsolved(), unsolved(), unsolved(),
         ],
 
-        vec![
+        [
             unsolved(), solved(5), solved(4),
             solved(7), solved(8), solved(3),
             unsolved(), solved(9), solved(6),
         ],
-        vec![
+        [
             unsolved(), unsolved(), solved(6),
             unsolved(), unsolved(), unsolved(),
             unsolved(), solved(5), unsolved(),
         ],
-        vec![
+        [
             unsolved(), unsolved(), unsolved(),
             solved(1), unsolved(), unsolved(),
             solved(4), unsolved(), unsolved(),
