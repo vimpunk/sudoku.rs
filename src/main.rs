@@ -11,6 +11,10 @@ fn main() {
     }
 }
 
+/// Represents a cell in a sudoku board. It may be solved, in which case
+/// `solution` needs to be some number, and `candidates`, `candidate`, and
+/// `candidate_idx` need be None; or it's unsolved in which case the above
+/// relationship is reversed.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Cell {
     solution: Option<i8>,
@@ -55,11 +59,15 @@ impl Sudoku {
         }
     }
 
+    /// If the board passed to the constructor is solvable, it returns a copy of
+    /// the solved board. If it's unsolvable, None is returned.
     pub fn solve(&mut self) -> Option<Board> {
         self.find_candidates();
         self.guess_solutions()
     }
 
+    /// Narrows down the search-space by assigning valid candidates to each cell
+    /// and marks cells as solved that only have a single candidate.
     fn find_candidates(&mut self) {
         for row in 0..9 {
             for col in 0..9 {
@@ -80,6 +88,8 @@ impl Sudoku {
         }
     }
 
+    /// Finds all possible candidates for a cell by checking solved cells in the
+    /// same row, column, and its block.
     fn find_cell_candidates(&self, row: usize, col: usize) -> HashSet<i8> {
         let mut candidates = HashSet::new();
         let block = &self.blocks[block_index(row, col)];
@@ -114,6 +124,10 @@ impl Sudoku {
         candidates
     }
 
+    /// Called when a solution for a cell is found in the preliminary candidate
+    /// assignment phase. The solution is removed from the candidate list of all
+    /// cells in the same row, column, and square, thus further narrowing down
+    /// the search-space.
     fn found_solution(&mut self, solution: i8, row: usize, col: usize) {
         // We have a solution for this cell.
         let cell = &mut self.board[row][col];
@@ -188,6 +202,8 @@ impl Sudoku {
         Some(self.board.clone())
     }
 
+    /// Returns a vector of (row, column) coordinates of the cells that are yet
+    /// to be solved.
     fn unsolved_cells(&self) -> Vec<(usize, usize)> {
         let mut unsolved_cells = Vec::new();
         for row in 0..9 {
@@ -247,11 +263,15 @@ impl Sudoku {
     }
 }
 
+/// A block represents a 3x3 block of cells in a Sudoku board. This is used by
+/// the solver to quickly verify that a candidate is not already solved in its
+/// block.
 #[derive(Debug, Eq, PartialEq)]
 struct Block {
     solutions: HashSet<i8>,
 }
 
+/// Partitions a Sudoku board into a vector of blocks.
 fn make_blocks(board: &Vec<Vec<Cell>>) -> Vec<Block> {
     let num_blocks = 9;
     let mut blocks = Vec::with_capacity(num_blocks);
@@ -274,6 +294,8 @@ fn make_blocks(board: &Vec<Vec<Cell>>) -> Vec<Block> {
     blocks
 }
 
+/// Returns the index of a block (in a vector of nine blocks) to which the cell
+/// at `row:col` belongs.
 fn block_index(row: usize, col: usize) -> usize {
     let block_idx = row / 3 * 3 + col / 3;
     assert!(block_idx < 9);
