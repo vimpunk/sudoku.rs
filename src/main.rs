@@ -43,24 +43,24 @@ pub type Board = Vec<Vec<Cell>>;
 
 pub struct Sudoku {
     board: Board,
-    squares: Vec<Square>,
+    blocks: Vec<Block>,
 }
 
 impl Sudoku {
     pub fn new(board: Board) -> Sudoku {
-        let squares = make_squares(&board);
+        let blocks = make_blocks(&board);
         Sudoku {
             board: board,
-            squares: squares,
+            blocks: blocks,
         }
     }
 
     pub fn solve(&mut self) -> Option<Board> {
-        self.find_all_candidates();
+        self.find_candidates();
         self.guess_solutions()
     }
 
-    fn find_all_candidates(&mut self) {
+    fn find_candidates(&mut self) {
         for row in 0..9 {
             for col in 0..9 {
                 // Skip solved cells.
@@ -68,7 +68,7 @@ impl Sudoku {
                     continue;
                 }
 
-                let candidates = self.find_candidates(row, col);
+                let candidates = self.find_cell_candidates(row, col);
                 if candidates.len() == 1 {
                     // We have a solution for this cell.
                     let solution = *candidates.iter().next().unwrap();
@@ -80,14 +80,14 @@ impl Sudoku {
         }
     }
 
-    fn find_candidates(&self, row: usize, col: usize) -> HashSet<i8> {
+    fn find_cell_candidates(&self, row: usize, col: usize) -> HashSet<i8> {
         let mut candidates = HashSet::new();
-        let square = &self.squares[square_index(row, col)];
-        assert!(square.solutions.len() < 9);
+        let block = &self.blocks[block_index(row, col)];
+        assert!(block.solutions.len() < 9);
 
         'candidate_selection: for candidate in 1..10 {
-            // Don't add to candidates if already in square.
-            if square.solutions.iter().any(|solved| *solved == candidate) {
+            // Don't add to candidates if already in block.
+            if block.solutions.iter().any(|solved| *solved == candidate) {
                 continue;
             }
 
@@ -117,24 +117,26 @@ impl Sudoku {
     fn found_solution(&mut self, solution: i8, row: usize, col: usize) {
         // We have a solution for this cell.
         let cell = &mut self.board[row][col];
-        let square = &mut self.squares[square_index(row, col)];
+        let block = &mut self.blocks[block_index(row, col)];
         cell.solution = Some(solution);
         cell.candidates.clear();
-        square.solutions.insert(solution);
+        block.solutions.insert(solution);
 
-        // Remove candidates in this square, row, and column that are the same as this
-        // solution.
+        // Remove candidates in this block, row, and column that are the same as
+        // this solution.
         for other_row in 0..9 {
             self.board[other_row][col].candidates.remove(&solution);
         }
+
         for other_col in 0..9 {
             self.board[row][other_col].candidates.remove(&solution);
         }
-        let square_row_start = (row / 3) * 3;
-        let square_col_start = (col / 3) * 3;
-        for square_row in square_row_start..square_row_start + 3 {
-            for square_col in square_col_start..square_col_start + 3 {
-                self.board[square_row][square_col].candidates.remove(&solution);
+
+        let block_row_start = (row / 3) * 3;
+        let block_col_start = (col / 3) * 3;
+        for block_row in block_row_start..block_row_start + 3 {
+            for block_col in block_col_start..block_col_start + 3 {
+                self.board[block_row][block_col].candidates.remove(&solution);
             }
         }
     }
@@ -142,22 +144,9 @@ impl Sudoku {
     /// A brute-force, backtracking algorithm that attempts to guess solutions for cells as
     /// a function of previous guesses made for other cells.
     fn guess_solutions(&mut self) -> Option<Board> {
-        let unsolved_cells = {
-            let mut unsolved_cells = Vec::new();
-            for row in 0..9 {
-                for col in 0..9 {
-                    if self.board[row][col].solution.is_none() {
-                        unsolved_cells.push((row, col));
-                    }
-                }
-            }
-            unsolved_cells
-        };
-
-        //println!("{} unsolved cells left: {:?}", unsolved_cells.len(), unsolved_cells);
-
+        let unsolved_cells = self.unsolved_cells();
         let mut i = 0;
-        'main_loop: while i < unsolved_cells.len() {
+        'cell_iteration: while i < unsolved_cells.len() {
             let (row, col) = unsolved_cells[i];
             let mut cand_idx = match self.board[row][col].candidate_idx {
                 Some(idx) => idx,
@@ -176,19 +165,14 @@ impl Sudoku {
                 self.board[row][col].candidate_idx = Some(cand_idx);
                 // If this candidate is good, go to the next cell.
                 if self.can_choose_candidate(row, col, candidate) {
-                    //println!("<C> cell {}:{} candidate: #{} of {:?}", row, col, cand_idx - 1, self.board[row][col].candidates);
                     i += 1;
-                    continue 'main_loop;
+                    continue 'cell_iteration;
                 }
             }
 
-            // If we're here, it means we haven't found any eligible candidate
-            // for this cell, so we need to backtrack.
-
-            //println!("<BT> cell {}:{} candidates {:?}", row, col, self.board[row][col].candidates);
-
-            // Reset candidate and its index so the next time we're here we can
-            // retry all candidates again.
+            // If we're here, it means we haven't found any eligible candidate for this
+            // cell, so we need to backtrack. Reset candidate and its index so the next
+            // time we're here we can retry all candidates again.
             self.board[row][col].candidate = None;
             self.board[row][col].candidate_idx = None;
             // If we're back at the first field after not finding any
@@ -199,7 +183,25 @@ impl Sudoku {
             i -= 1;
         }
 
-        // Fill in solutions.
+        self.fill_in_solutions();
+
+        Some(self.board.clone())
+    }
+
+    fn unsolved_cells(&self) -> Vec<(usize, usize)> {
+        let mut unsolved_cells = Vec::new();
+        for row in 0..9 {
+            for col in 0..9 {
+                if self.board[row][col].solution.is_none() {
+                    unsolved_cells.push((row, col));
+                }
+            }
+        }
+        unsolved_cells
+    }
+
+    /// Iterates over unsolved cells and makes their chosen candidate their solution.
+    fn fill_in_solutions(&mut self) {
         for row in 0..9 {
             for col in 0..9 {
                 let cell = &mut self.board[row][col];
@@ -213,13 +215,11 @@ impl Sudoku {
                 }
             }
         }
-
-        Some(self.board.clone())
     }
 
     /// Determines whether we can choose candidate for this cell based on
     /// previous candidate choices. Candidate is otherwise assumed to be correct
-    /// based on other cells solved in its square, row, and column.
+    /// based on other cells solved in its block, row, and column.
     fn can_choose_candidate(&self, row: usize, col: usize, candidate: i8) -> bool {
         for other_col in 0..col {
             let other_cell = &self.board[row][other_col];
@@ -248,36 +248,36 @@ impl Sudoku {
 }
 
 #[derive(Debug, Eq, PartialEq)]
-struct Square {
+struct Block {
     solutions: HashSet<i8>,
 }
 
-fn make_squares(board: &Vec<Vec<Cell>>) -> Vec<Square> {
-    let num_squares = 9;
-    let mut squares = Vec::with_capacity(num_squares);
+fn make_blocks(board: &Vec<Vec<Cell>>) -> Vec<Block> {
+    let num_blocks = 9;
+    let mut blocks = Vec::with_capacity(num_blocks);
 
-    // Fill squares vec. TODO more idiomatic way of doing this?
-    for _ in 0..num_squares {
-        squares.push(Square { solutions: HashSet::new() });
+    // Fill blocks vec. TODO more idiomatic way of doing this?
+    for _ in 0..num_blocks {
+        blocks.push(Block { solutions: HashSet::new() });
     }
 
     for (row_idx, row) in board.iter().enumerate() {
         for (col_idx, col) in row.iter().enumerate() {
             if let Some(num) = col.solution {
-                let square_idx = square_index(row_idx, col_idx);
-                assert!(square_idx < squares.len());
-                squares[square_idx].solutions.insert(num);
+                let block_idx = block_index(row_idx, col_idx);
+                assert!(block_idx < blocks.len());
+                blocks[block_idx].solutions.insert(num);
             }
         }
     }
 
-    squares
+    blocks
 }
 
-fn square_index(row: usize, col: usize) -> usize {
-    let square_idx = row / 3 * 3 + col / 3;
-    assert!(square_idx < 9);
-    square_idx
+fn block_index(row: usize, col: usize) -> usize {
+    let block_idx = row / 3 * 3 + col / 3;
+    assert!(block_idx < 9);
+    block_idx
 }
 
 #[cfg(test)]
@@ -285,21 +285,21 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_make_squares() {
+    fn test_make_blocks() {
         let board = default_board();
-        let squares = make_squares(&board);
-        println!("{:#?}", squares);
+        let blocks = make_blocks(&board);
+        println!("{:#?}", blocks);
 
-        assert_eq!(squares, vec![
-            Square { solutions: vec![5, 2, 7, 9].iter().cloned().collect::<HashSet<i8>>(), },
-            Square { solutions: vec![8, 3, 4, 5].iter().cloned().collect::<HashSet<i8>>(), },
-            Square { solutions: vec![5, 6, 2].iter().cloned().collect::<HashSet<i8>>(), },
-            Square { solutions: vec![4, 9, 1, 7].iter().cloned().collect::<HashSet<i8>>(), },
-            Square { solutions: vec![6, 4, 5, 7, 8, 2].iter().cloned().collect::<HashSet<i8>>(), },
-            Square { solutions: vec![7, 8, 1, 3].iter().cloned().collect::<HashSet<i8>>(), },
-            Square { solutions: vec![5, 4, 6].iter().cloned().collect::<HashSet<i8>>(), },
-            Square { solutions: vec![7, 8, 3, 1].iter().cloned().collect::<HashSet<i8>>(), },
-            Square { solutions: vec![9, 6, 5, 4].iter().cloned().collect::<HashSet<i8>>(), },
+        assert_eq!(blocks, vec![
+            Block { solutions: vec![5, 2, 7, 9].iter().cloned().collect::<HashSet<i8>>(), },
+            Block { solutions: vec![8, 3, 4, 5].iter().cloned().collect::<HashSet<i8>>(), },
+            Block { solutions: vec![5, 6, 2].iter().cloned().collect::<HashSet<i8>>(), },
+            Block { solutions: vec![4, 9, 1, 7].iter().cloned().collect::<HashSet<i8>>(), },
+            Block { solutions: vec![6, 4, 5, 7, 8, 2].iter().cloned().collect::<HashSet<i8>>(), },
+            Block { solutions: vec![7, 8, 1, 3].iter().cloned().collect::<HashSet<i8>>(), },
+            Block { solutions: vec![5, 4, 6].iter().cloned().collect::<HashSet<i8>>(), },
+            Block { solutions: vec![7, 8, 3, 1].iter().cloned().collect::<HashSet<i8>>(), },
+            Block { solutions: vec![9, 6, 5, 4].iter().cloned().collect::<HashSet<i8>>(), },
         ]);
     }
 
@@ -312,15 +312,15 @@ mod tests {
                 for col in 0..9 {
                     let solution = solved_board[row][col].solution;
 
-                    // Check that this cell's solution is unique in its square.
-                    let square_row_start = (row / 3) * 3;
-                    let square_col_start = (col / 3) * 3;
-                    for square_row in square_row_start..square_row_start + 3 {
-                        for square_col in square_col_start..square_col_start + 3 {
-                            if square_row == row && square_col == col {
+                    // Check that this cell's solution is unique in its block.
+                    let block_row_start = (row / 3) * 3;
+                    let block_col_start = (col / 3) * 3;
+                    for block_row in block_row_start..block_row_start + 3 {
+                        for block_col in block_col_start..block_col_start + 3 {
+                            if block_row == row && block_col == col {
                                 continue;
                             }
-                            assert_ne!(solution, solved_board[square_row][square_col].solution);
+                            assert_ne!(solution, solved_board[block_row][block_col].solution);
                         }
                     }
 
