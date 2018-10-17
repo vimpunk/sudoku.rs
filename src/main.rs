@@ -348,6 +348,43 @@ mod tests {
 
     #[test]
     fn test_solver() {
+        let board = default_board();
+        let mut sudoku = Sudoku::new(board);
+        if let Some(solved_board) = sudoku.solve() {
+            for row in 0..9 {
+                for col in 0..9 {
+                    let solution = solved_board[row][col].solution;
+
+                    // Check that this cell's solution is unique in its square.
+                    let square_row_start = (row / 3) * 3;
+                    let square_col_start = (col / 3) * 3;
+                    for square_row in square_row_start..square_row_start + 3 {
+                        for square_col in square_col_start..square_col_start + 3 {
+                            if square_row == row && square_col == col {
+                                continue;
+                            }
+                            assert_ne!(solution, solved_board[square_row][square_col].solution);
+                        }
+                    }
+
+                    // Verify that solution is unique in its row.
+                    for other_col in 0..9 {
+                        if other_col != col {
+                            assert_ne!(solution, solved_board[row][other_col].solution);
+                        }
+                    }
+
+                    // Verify that solution is unique in its column.
+                    for other_row in 0..9 {
+                        if other_row != row {
+                            assert_ne!(solution, solved_board[other_row][col].solution);
+                        }
+                    }
+                }
+            }
+        } else {
+            assert!(false);
+        }
     }
 }
 
