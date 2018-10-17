@@ -57,11 +57,6 @@ impl Sudoku {
 
     pub fn solve(&mut self) -> Option<Board> {
         self.find_all_candidates();
-        //println!("\n\n Board after finding candidates:");
-        //print_board(&self.board);
-        self.mutually_exclude_candidates();
-        //println!("\n\n Board after mutually excluding candidates:");
-        //print_board(&self.board);
         self.guess_solutions()
     }
 
@@ -144,46 +139,8 @@ impl Sudoku {
         }
     }
 
-    fn mutually_exclude_candidates(&mut self) {
-        for row in 0..9 {
-            for col in 0..9 {
-                // Skip solved cells.
-                if self.board[row][col].solution.is_some() {
-                    continue;
-                }
-
-                // clone to appease the borrow-checker. TODO remove
-                'candidate_elimination: for candidate in self.board[row][col].candidates.clone().iter() {
-                    for other_row in 0..9 {
-                        if self.board[other_row][col].candidates.contains(&candidate) {
-                            continue 'candidate_elimination;
-                        }
-                    }
-                    for other_col in 0..9 {
-                        if self.board[row][other_col].candidates.contains(&candidate) {
-                            continue 'candidate_elimination;
-                        }
-                    }
-                    let square_row_start = (row / 3) * 3;
-                    let square_col_start = (col / 3) * 3;
-                    for square_row in square_row_start..square_row_start + 3 {
-                        for square_col in square_col_start..square_col_start + 3 {
-                            if self.board[square_row][square_col].candidates.contains(&candidate) {
-                                continue 'candidate_elimination;
-                            }
-                        }
-                    }
-
-                    // This candidate is not present in any other
-                    // conflicting cell, so consider it a solution.
-                    self.found_solution(*candidate, row, col);
-                }
-            }
-        }
-    }
-
-    /// A brute-force, backtracking algorithm that attempts to guess solutions
-    /// for cells as a function of previous guesses made for other cells.
+    /// A brute-force, backtracking algorithm that attempts to guess solutions for cells as
+    /// a function of previous guesses made for other cells.
     fn guess_solutions(&mut self) -> Option<Board> {
         let unsolved_cells = {
             let mut unsolved_cells = Vec::new();
