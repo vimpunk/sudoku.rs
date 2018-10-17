@@ -197,7 +197,7 @@ impl Sudoku {
             i -= 1;
         }
 
-        self.fill_in_solutions();
+        self.use_final_candidates();
 
         Some(self.board.clone())
     }
@@ -216,18 +216,17 @@ impl Sudoku {
         unsolved_cells
     }
 
-    /// Iterates over unsolved cells and makes their chosen candidate their solution.
-    fn fill_in_solutions(&mut self) {
+    /// Iterates over unsolved cells and makes their chosen candidate as their solution.
+    fn use_final_candidates(&mut self) {
         for row in 0..9 {
             for col in 0..9 {
                 let cell = &mut self.board[row][col];
-                if cell.solution.is_some() {
-                    continue;
-                }
-                if let Some(cand) = cell.candidate {
-                    cell.solution = Some(cand);
-                } else {
-                    println!("WARN: missing solution at {}:{}", row, col);
+                if cell.solution.is_none() {
+                    if let Some(cand) = cell.candidate {
+                        cell.solution = Some(cand);
+                    } else {
+                        println!("WARN: missing solution at {}:{}", row, col);
+                    }
                 }
             }
         }
@@ -237,28 +236,29 @@ impl Sudoku {
     /// previous candidate choices. Candidate is otherwise assumed to be correct
     /// based on other cells solved in its block, row, and column.
     fn can_choose_candidate(&self, row: usize, col: usize, candidate: i8) -> bool {
+        // TODO: maybe we could use a reverse index to avoid all these iterations?
         for other_col in 0..col {
             let other_cell = &self.board[row][other_col];
-            if other_cell.solution.is_some() {
-                continue;
-            }
-            if let Some(other_cand) = other_cell.candidate {
-                if other_cand == candidate {
-                    return false;
+            if other_cell.solution.is_none() {
+                if let Some(other_cand) = other_cell.candidate {
+                    if other_cand == candidate {
+                        return false;
+                    }
                 }
             }
         }
+
         for other_row in 0..row {
             let other_cell = &self.board[other_row][col];
-            if let Some(_) = other_cell.solution {
-                continue;
-            }
-            if let Some(other_cand) = other_cell.candidate {
-                if other_cand == candidate {
-                    return false;
+            if other_cell.solution.is_none() {
+                if let Some(other_cand) = other_cell.candidate {
+                    if other_cand == candidate {
+                        return false;
+                    }
                 }
             }
         }
+
         true
     }
 }
