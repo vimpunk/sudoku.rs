@@ -159,9 +159,9 @@ impl Sudoku {
     /// a function of previous guesses made for other cells.
     fn guess_solutions(&mut self) -> Option<Board> {
         let unsolved_cells = self.unsolved_cells();
-        let mut i = 0;
-        'cell_iteration: while i < unsolved_cells.len() {
-            let (row, col) = unsolved_cells[i];
+        let mut cell_idx = 0;
+        'cell_iteration: while cell_idx < unsolved_cells.len() {
+            let (row, col) = unsolved_cells[cell_idx];
             let mut cand_idx = match self.board[row][col].candidate_idx {
                 Some(idx) => idx,
                 None => 0,
@@ -179,7 +179,7 @@ impl Sudoku {
                 self.board[row][col].candidate_idx = Some(cand_idx);
                 // If this candidate is good, go to the next cell.
                 if self.can_choose_candidate(row, col, candidate) {
-                    i += 1;
+                    cell_idx += 1;
                     continue 'cell_iteration;
                 }
             }
@@ -191,10 +191,10 @@ impl Sudoku {
             self.board[row][col].candidate_idx = None;
             // If we're back at the first field after not finding any
             // candidates, it means there is no solution.
-            if i == 0 {
+            if cell_idx == 0 {
                 return None;
             }
-            i -= 1;
+            cell_idx -= 1;
         }
 
         self.use_final_candidates();
